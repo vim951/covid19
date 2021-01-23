@@ -4,6 +4,11 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+import "popper.js"
+import "jquery"
+import "bootstrap/dist/js/bootstrap.min"
+import "bootstrap/dist/css/bootstrap.min.css"
+
 ReactDOM.render(
   <React.StrictMode>
     <App />
