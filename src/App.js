@@ -25,10 +25,10 @@ import {
 } from "@react-firebase/auth";
 
 import {
-    FirestoreCollection
+    FirestoreCollection,
+    FirestoreMutation,
+    FirestoreProvider
 } from "@react-firebase/firestore";
-
-import { FirestoreProvider } from "@react-firebase/firestore";
 
 //====================================================================================================
 
@@ -100,6 +100,15 @@ function HomePage() {
         <>
             <h2>Welcome home!</h2>
             <APICallSummary/>
+            <FirestoreMutation type='update' path="/API_data/u3uAg0dPCFbbbWtotQG5">
+                {({ runMutation }) => (
+                    runMutation({
+                        t1: 'c',
+                        t2: 'd'
+                    })
+                )}
+                <div />
+            </FirestoreMutation>
         </>
     );
 }
@@ -141,11 +150,17 @@ function LogInMessageForLoggedIn(){
                     <>
                         <h2 className="mt-5 mb-3" >Welcome back!</h2>
                         <p>We are happy to see you {user.displayName}! Here are you profile parameters:</p>
-                        <ul>
-                            <li>Name: {user.displayName}</li>
-                            <li>Email: {user.email}</li>
-                            <li>Photo: {user.photoURL}</li>
-                        </ul>
+                        <div className="row">
+                            <div className="col-4 mb-3">
+                                <img src={user.photoURL} className="rounded float-left" alt="url"/>
+                            </div>
+                            <div className="col-8 mb-3">
+                                <ul>
+                                    <li>Name: {user.displayName}</li>
+                                    <li>Email: {user.email}</li>
+                                </ul>
+                            </div>
+                        </div>
                         <LogOut/>
                     </>
                 );
