@@ -42,6 +42,12 @@ import { faGoogle } from '@fortawesome/free-brands-svg-icons'
 
 import MaterialTable from "material-table";
 
+import { Pie, Bar, Line } from 'react-chartjs-2'
+
+export const RED = 'rgb(255, 99, 132)';
+export const GREEN = 'rgb(75, 192, 192)';
+export const BLUE = 'rgb(54, 162, 235)';
+
 //====================================================================================================
 
 const firebaseConfig = {
@@ -65,7 +71,10 @@ export default function App() {
                         <div className="navbar navbar-expand-lg bg-dark navbar-dark">
                             <ul className="navbar-nav ml-auto">
                                 <li className="nav-item active">
-                                    <Link className="nav-link" to="/">Home</Link>
+                                    <Link className="nav-link" to="/">Global summary</Link>
+                                </li>
+                                <li className="nav-item active">
+                                    <Link className="nav-link" to="/summary_per_country">Summary per country</Link>
                                 </li>
                                 <li className="nav-item active">
                                     <Link className="nav-link" to="/news">News</Link>
@@ -84,8 +93,11 @@ export default function App() {
                                 <Route path="/login">
                                     <LoginPage />
                                 </Route>
+                                <Route path="/summary_per_country">
+                                    <SummaryPerCountryPage />
+                                </Route>
                                 <Route path="/">
-                                    <HomePage />
+                                    <GlobalSummaryPage />
                                 </Route>
                             </Switch>
                         </div>
@@ -97,65 +109,283 @@ export default function App() {
 
 //====================================================================================================
 
-function HomePage() {
+function GlobalSummaryPage() {
     return (
         <>
-            <h2>Welcome home!</h2>
-            <APISummaryPerCountryTable/>
+            <h1 className={'mt-5 mb-3'}>Worldwide data</h1>
+            <APIGlobalSummaryPart1/>
+            <APIGlobalSummaryPart2/>
+            <APIGlobalSummaryPart3/>
         </>
     );
 }
 
+function sortDateArray(a,b){
+    return new Date(a) - new Date(b);
+}
+
+function APIGlobalSummaryPart1(){
+    return (
+        <APIComponent api_url={'https://api.covid19api.com/summary'} doc_id={'global_summary_part1'} render_function={(data) => {
+            const columns = [
+                {
+                    title: "Total confirmed",
+                    field: "TotalConfirmed",
+                },
+                {
+                    title: "New confirmed",
+                    field: "NewConfirmed",
+                },
+                {
+                    title: "Active cases",
+                    field: "ActiveCases",
+                },
+                {
+                    title: "Total recovered",
+                    field: "TotalRecovered",
+                },
+                {
+                    title: "New recovered",
+                    field: "NewRecovered",
+                },
+                {
+                    title: "Recovery rate",
+                    field: "RecoveryRate",
+                },
+                {
+                    title: "Total deaths",
+                    field: "TotalDeaths",
+                },
+                {
+                    title: "New deaths",
+                    field: "NewDeaths",
+                },
+                {
+                    title: "Mortality rate",
+                    field: "MortalityRate",
+                },
+            ];
+            data.Global.RecoveryRate = (100 * data.Global.TotalRecovered / data.Global.TotalConfirmed).toFixed(2) + "%";
+            data.Global.MortalityRate = (100 * data.Global.TotalDeaths / data.Global.TotalConfirmed).toFixed(2) + "%";
+            data.Global.ActiveCases = data.Global.TotalConfirmed - data.Global.TotalDeaths - data.Global.TotalRecovered;
+            const pie_data = {
+                labels: ['Active', 'Recovered', 'Dead'],
+                datasets: [
+                    {
+                        backgroundColor: [
+                            BLUE,
+                            GREEN,
+                            RED
+                        ],
+                        data: [
+                            data.Global.ActiveCases,
+                            data.Global.TotalRecovered,
+                            data.Global.TotalDeaths
+                        ]
+                    },
+                ],
+            }
+            return (
+                <>
+                    <MaterialTable
+                        title={'Covid19 summary'}
+                        data={[data.Global]}
+                        columns={columns}
+                        options={{ search: false, paging: false, filtering: false, exportButton: true }}
+                    />
+                    <h2 className={'mt-5 mb-3'}>Covid19 cases distribution</h2>
+                    <Pie data={pie_data}/>
+                </>
+            );
+        }}/>
+    );
+}
+
+function APIGlobalSummaryPart2(){
+    return (
+        <APIComponent api_url={'https://corona.lmao.ninja/v2/historical/all?lastdays=7'} doc_id={'global_summary_part2'} render_function={(data) => {
+            const bar_data = {
+                labels: Object.keys(data.cases).sort(sortDateArray),
+                datasets: [
+                    {
+                        label: 'cases',
+                        data: Object.values(Object.keys(data.cases).sort(sortDateArray).reduce(
+                            (obj, key) => {
+                                obj[key] = data.cases[key];
+                                return obj;
+                            },
+                            {}
+                        )),
+                        backgroundColor: BLUE,
+                    },
+                    {
+                        label: 'recovered',
+                        data: Object.values(Object.keys(data.recovered).sort(sortDateArray).reduce(
+                            (obj, key) => {
+                                obj[key] = data.recovered[key];
+                                return obj;
+                            },
+                            {}
+                        )),
+                        backgroundColor: GREEN,
+                    },
+                    {
+                        label: 'deaths',
+                        data: Object.values(Object.keys(data.deaths).sort(sortDateArray).reduce(
+                            (obj, key) => {
+                                obj[key] = data.deaths[key];
+                                return obj;
+                            },
+                            {}
+                        )),
+                        backgroundColor: RED,
+                    },
+                ],
+            }
+            const options = {
+                scales: {
+                    yAxes: [
+                        {
+                            ticks: {
+                                beginAtZero: true,
+                            },
+                        },
+                    ],
+                },
+            }
+            return (
+                <>
+                    <h2 className={'mt-5 mb-3'}>Daily covid19 cases (7 days)</h2>
+                    <Bar data={bar_data} options={options} />
+                </>
+            );
+        }}/>
+    );
+}
+
+function APIGlobalSummaryPart3(){
+    return (
+        <APIComponent api_url={'https://corona.lmao.ninja/v2/historical/all'} doc_id={'global_summary_part3'} render_function={(data) => {
+            const line_data = {
+                labels: Object.keys(data.cases).sort(sortDateArray),
+                datasets: [
+                    {
+                        label: 'deaths',
+                        data: Object.values(Object.keys(data.deaths).sort(sortDateArray).reduce(
+                            (obj, key) => {
+                                obj[key] = data.deaths[key];
+                                return obj;
+                            },
+                            {}
+                        )),
+                        backgroundColor: RED,
+                    },
+                    {
+                        label: 'cases',
+                        data: Object.values(Object.keys(data.cases).sort(sortDateArray).reduce(
+                            (obj, key) => {
+                                obj[key] = data.cases[key];
+                                return obj;
+                            },
+                            {}
+                        )),
+                        backgroundColor: BLUE,
+                    },
+                    {
+                        label: 'recovered',
+                        data: Object.values(Object.keys(data.recovered).sort(sortDateArray).reduce(
+                            (obj, key) => {
+                                obj[key] = data.recovered[key];
+                                return obj;
+                            },
+                            {}
+                        )),
+                        backgroundColor: GREEN,
+                    },
+                ],
+            }
+            const options = {
+                scales: {
+                    yAxes: [
+                        {
+                            stacked: true,
+                            ticks: {
+                                beginAtZero: true,
+                            },
+                        },
+                    ],
+                    xAxes: [
+                        {
+                            stacked: true,
+                        },
+                    ],
+                },
+            }
+            return (
+                <>
+                    <h2 className={'mt-5 mb-3'}>Daily covid19 cases (30 days)</h2>
+                    <Line data={line_data} options={options} />
+                </>
+            );
+        }}/>
+    );
+}
+
+//====================================================================================================
+
+function SummaryPerCountryPage() {
+    return <APISummaryPerCountryTable/>;
+}
+
 function APISummaryPerCountryTable(){
-    return <APIComponent api_url={'https://api.covid19api.com/summary'} doc_id={'summary'} render_function={(data) => {
-        const columns = [
-            {
-                title: "Country code",
-                field: "CountryCode",
-            },
-            {
-                title: "Country",
-                field: "Country",
-            },
-            {
-                title: "New confirmed",
-                field: "NewConfirmed",
-            },
-            {
-                title: "Total confirmed",
-                field: "TotalConfirmed",
-            },
-            {
-                title: "New recovered",
-                field: "NewRecovered",
-            },
-            {
-                title: "Total recovered",
-                field: "TotalRecovered",
-            },
-            {
-                title: "New deaths",
-                field: "NewDeaths",
-            },
-            {
-                title: "Total deaths",
-                field: "TotalDeaths",
-            },
-        ];
-        return (
-            <>
-                <pre style={{ height: 300, overflow: "auto" }}>
-                    {JSON.stringify(data, null, 2)}
-                </pre>
-                <MaterialTable
-                    title="Summary per country"
-                    data={data.Countries}
-                    columns={columns}
-                    options={{ search: true, paging: true, filtering: true, exportButton: true }}
-                />
-            </>
-        );
-    }}/>;
+    return (
+        <APIComponent api_url={'https://api.covid19api.com/summary'} doc_id={'summary'} render_function={(data) => {
+            const columns = [
+                {
+                    title: "Country code",
+                    field: "CountryCode",
+                },
+                {
+                    title: "Country",
+                    field: "Country",
+                },
+                {
+                    title: "New confirmed",
+                    field: "NewConfirmed",
+                },
+                {
+                    title: "Total confirmed",
+                    field: "TotalConfirmed",
+                },
+                {
+                    title: "New recovered",
+                    field: "NewRecovered",
+                },
+                {
+                    title: "Total recovered",
+                    field: "TotalRecovered",
+                },
+                {
+                    title: "New deaths",
+                    field: "NewDeaths",
+                },
+                {
+                    title: "Total deaths",
+                    field: "TotalDeaths",
+                },
+            ];
+            return (
+                <>
+                    <MaterialTable
+                        title="Summary per country"
+                        data={data.Countries}
+                        columns={columns}
+                        options={{ search: true, paging: true, pageSize: 20, pageSizeOptions: [10, 20, 50, 100, 200], filtering: true, exportButton: true }}
+                    />
+                </>
+            );
+        }}/>
+    );
 }
 
 class APIComponent extends React.Component {
@@ -169,6 +399,8 @@ class APIComponent extends React.Component {
     constructor(props) {
         super(props);
         this.check_doc = this.check_doc.bind(this)
+        this.update_data = this.update_data.bind(this)
+        this.update_doc = this.update_doc.bind(this)
     }
 
     componentDidMount(){
@@ -199,14 +431,16 @@ class APIComponent extends React.Component {
 
     call_api(){
         fetch(this.props.api_url)
-            .then(this.update_data)
-            .then(this.update_doc)
+            .then((response) =>
+                Promise.resolve(response.json()).then(this.update_doc)
+            )
     }
 
-    update_doc(response){
+    update_doc(data){
         db.collection("API_data")
             .doc(this.props.doc_id)
-            .set(response)
+            .set(data)
+        this.update_data(data);
     }
 
     render() {
