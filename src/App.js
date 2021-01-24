@@ -42,7 +42,7 @@ import { faGoogle } from '@fortawesome/free-brands-svg-icons'
 
 //====================================================================================================
 
-export const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyDJvf-n2x8FV9k4rAOzgR1ftZ_pzrv8mvQ",
   authDomain: "covid19-bd85f.firebaseapp.com",
   projectId: "covid19-bd85f",
@@ -50,13 +50,14 @@ export const firebaseConfig = {
   messagingSenderId: "71913870941",
   appId: "1:71913870941:web:ae692dfbf368e8d6f7dfb4"
 };
+const firebaseApp = firebase.initializeApp(firebaseConfig);
+export const db = firebaseApp.firestore();
 
 //====================================================================================================
 
 export default function App() {
     return (
         <FirebaseAuthProvider firebase={firebase} {...firebaseConfig}>
-            <FirestoreProvider firebase={firebase} {...firebaseConfig}>
                 {
                     <Router>
                         <div className="navbar navbar-expand-lg bg-dark navbar-dark">
@@ -88,7 +89,6 @@ export default function App() {
                         </div>
                     </Router>
                 }
-            </FirestoreProvider>
         </FirebaseAuthProvider>
     );
 }
@@ -96,34 +96,51 @@ export default function App() {
 //====================================================================================================
 
 function HomePage() {
+    console.log(checkIfSummaryIsOutdated())
     return (
         <>
             <h2>Welcome home!</h2>
-            <APICallSummary/>
-            <FirestoreMutation type='update' path="/API_data/u3uAg0dPCFbbbWtotQG5">
-                {({ runMutation }) => (
-                    runMutation({
-                        t1: 'c',
-                        t2: 'd'
-                    })
-                )}
-                <div />
-            </FirestoreMutation>
         </>
     );
 }
 
-function APICallSummary(){
+function APIFetchSummary(){
     return <Fetch url="https://api.covid19api.com/summary">
-        <APIResultSummary/>
+        <UpdateSummaryData/>
     </Fetch>
+}
+
+function checkIfSummaryIsOutdated(){
+    db.collection("API_data")
+        .doc('summary')
+        .get()
+        .then(doc => {
+            return ((new Date().getTime())-(new Date(doc.data().Date)).getTime())>(24*3600*1000)
+        });
+}
+
+class UpdateSummaryData extends React.Component {
+    render() {
+        if (this.props.Countries) {
+            db.collection("API_data").doc("summary").set(this.props)
+        }
+        return <div/>;
+    }
 }
 
 class APIResultSummary extends React.Component{
     render(){
-        return <pre style={{ height: 300, overflow: "auto" }}>
-                {JSON.stringify(this.props, null, 2)}
-              </pre>
+        if (this.props.Countries) {
+            return (
+                <>
+                <pre style={{ height: 300, overflow: "auto" }}>
+                    {JSON.stringify(this.props, null, 2)}
+                </pre>
+                </>
+            );
+        }else{
+            return <Loading/>;
+        }
     }
 }
 
@@ -237,14 +254,14 @@ function NewsPage() {
           <h2 className="mt-5 mb-3">Latest news</h2>
           <FirestoreCollection path="/news/" limit={20}>
               {docs => {
-                  return docs.isLoading ? <LoadingNews/> : <PrintNews docs={docs}/>
+                  return docs.isLoading ? <Loading/> : <PrintNews docs={docs}/>
               }}
           </FirestoreCollection>
       </>
   );
 }
 
-function LoadingNews(){
+function Loading(){
     return (
         <div className="spinner-grow" role="status">
             <span className="sr-only">Loading...</span>
