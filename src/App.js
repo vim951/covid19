@@ -11,6 +11,8 @@ import {
   useParams
 } from "react-router-dom";
 
+import PropTypes from 'prop-types'
+
 //====================================================================================================
 
 import firebase from "firebase/app";
@@ -32,13 +34,13 @@ import {
 
 //====================================================================================================
 
-import Fetch from 'react-fetch'
-
-//====================================================================================================
-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons'
 import { faGoogle } from '@fortawesome/free-brands-svg-icons'
+
+//====================================================================================================
+
+import MaterialTable from "material-table";
 
 //====================================================================================================
 
@@ -96,52 +98,125 @@ export default function App() {
 //====================================================================================================
 
 function HomePage() {
-    console.log(checkIfSummaryIsOutdated())
     return (
         <>
             <h2>Welcome home!</h2>
+            <APISummaryPerCountryTable/>
         </>
     );
 }
 
-function APIFetchSummary(){
-    return <Fetch url="https://api.covid19api.com/summary">
-        <UpdateSummaryData/>
-    </Fetch>
-}
-
-function checkIfSummaryIsOutdated(){
-    db.collection("API_data")
-        .doc('summary')
-        .get()
-        .then(doc => {
-            return ((new Date().getTime())-(new Date(doc.data().Date)).getTime())>(24*3600*1000)
-        });
-}
-
-class UpdateSummaryData extends React.Component {
-    render() {
-        if (this.props.Countries) {
-            db.collection("API_data").doc("summary").set(this.props)
-        }
-        return <div/>;
-    }
-}
-
-class APIResultSummary extends React.Component{
-    render(){
-        if (this.props.Countries) {
-            return (
-                <>
+function APISummaryPerCountryTable(){
+    return <APIComponent api_url={'https://api.covid19api.com/summary'} doc_id={'summary'} render_function={(data) => {
+        const columns = [
+            {
+                title: "Country code",
+                field: "CountryCode",
+            },
+            {
+                title: "Country",
+                field: "Country",
+            },
+            {
+                title: "New confirmed",
+                field: "NewConfirmed",
+            },
+            {
+                title: "Total confirmed",
+                field: "TotalConfirmed",
+            },
+            {
+                title: "New recovered",
+                field: "NewRecovered",
+            },
+            {
+                title: "Total recovered",
+                field: "TotalRecovered",
+            },
+            {
+                title: "New deaths",
+                field: "NewDeaths",
+            },
+            {
+                title: "Total deaths",
+                field: "TotalDeaths",
+            },
+        ];
+        return (
+            <>
                 <pre style={{ height: 300, overflow: "auto" }}>
-                    {JSON.stringify(this.props, null, 2)}
+                    {JSON.stringify(data, null, 2)}
                 </pre>
-                </>
-            );
+                <MaterialTable
+                    title="Summary per country"
+                    data={data.Countries}
+                    columns={columns}
+                    options={{ search: true, paging: true, filtering: true, exportButton: true }}
+                />
+            </>
+        );
+    }}/>;
+}
+
+class APIComponent extends React.Component {
+
+    static propTypes = {
+        api_url: PropTypes.string,
+        doc_id: PropTypes.string,
+        render_function: PropTypes.func
+    }
+
+    constructor(props) {
+        super(props);
+        this.check_doc = this.check_doc.bind(this)
+    }
+
+    componentDidMount(){
+        this.request_doc();
+    }
+
+    request_doc(){
+        db.collection("API_data")
+            .doc(this.props.doc_id)
+            .get()
+            .then(this.check_doc);
+    }
+
+    check_doc(doc){
+        console.log(doc.data())
+        if (((new Date().getTime())-(new Date(doc.data().Date)).getTime())>(24*3600*1000)){
+            console.log('Document outdated')
+            this.call_api();
+        }else{
+            console.log('Document up to date')
+            this.update_data(doc.data());
+        }
+    }
+
+    update_data(data){
+        this.setState({data:  data});
+    }
+
+    call_api(){
+        fetch(this.props.api_url)
+            .then(this.update_data)
+            .then(this.update_doc)
+    }
+
+    update_doc(response){
+        db.collection("API_data")
+            .doc(this.props.doc_id)
+            .set(response)
+    }
+
+    render() {
+        if (this.state){
+            return this.props.render_function(this.state.data);
         }else{
             return <Loading/>;
         }
     }
+
 }
 
 //====================================================================================================
