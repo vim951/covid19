@@ -16,6 +16,7 @@
     "chart.js": "^2.9.4",
     "firebase": "^8.2.4",
     "jquery": "^3.5.1",
+    "jsonata": "^1.8.4",
     "material-table": "^1.69.2",
     "popper.js": "^1.16.1",
     "react": "^17.0.1",
