@@ -1,9 +1,0 @@
-        if (this.state){
-            return <div className="row">
-                {this.state.d.map(doc => {
-                    return <p>{doc.data()}</p>;
-                })}
-            </div>;
-        }else{
-            return <Loading/>;
-        }

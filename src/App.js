@@ -88,38 +88,42 @@ export const groupBy = function(xs, key) {
 export default function App() {
     return (
         <FirebaseAuthProvider firebase={firebase} {...firebaseConfig}>
-                {
-                    <Router>
-                        <div className="navbar navbar-expand-lg bg-dark navbar-dark">
-                            <ul className="navbar-nav ml-auto">
-                                <li className="nav-item active">
-                                    <Link className="nav-link" to="/">Get informed</Link>
-                                </li>
-                                <li className="nav-item active">
-                                    <Link className="nav-link" to="/contribute">Contribute</Link>
-                                </li>
-                                <li className="nav-item">
-                                    <Link className="nav-link" to="/login">Login</Link>
-                                </li>
-                            </ul>
-                        </div>
+            {
+                <Router>
+                    <div className="navbar navbar-expand-lg bg-dark navbar-dark">
+                        <a className="navbar-brand" href="/">
+                            <img src="https://firebasestorage.googleapis.com/v0/b/covid19-bd85f.appspot.com/o/covid19.png?alt=media&token=157c859b-ac3f-4d34-9b63-d570c9d300f9" width="48" height="30" alt=""/>
+                            Corona-Monitor
+                        </a>
+                        <ul className="navbar-nav ml-auto">
+                            <li className="nav-item active">
+                                <Link className="nav-link" to="/">Get informed</Link>
+                            </li>
+                            <li className="nav-item active">
+                                <Link className="nav-link" to="/contribute">Contribute</Link>
+                            </li>
+                            <li className="nav-item">
+                                <Link className="nav-link" to="/login">Login</Link>
+                            </li>
+                        </ul>
+                    </div>
 
-                        <div className="container">
-                            <Switch>
-                                <Route path="/contribute">
-                                    <ContributionPage />
-                                </Route>
-                                <Route path="/login">
-                                    <LoginPage />
-                                </Route>
-                                <Route path="/country/:id" component={SummaryCountryPage}/>
-                                <Route path="/">
-                                    <GlobalSummaryPage />
-                                </Route>
-                            </Switch>
-                        </div>
-                    </Router>
-                }
+                    <div className="container">
+                        <Switch>
+                            <Route path="/contribute">
+                                <ContributionPage />
+                            </Route>
+                            <Route path="/login">
+                                <LoginPage />
+                            </Route>
+                            <Route path="/country/:id" component={SummaryCountryPage}/>
+                            <Route path="/">
+                                <GlobalSummaryPage />
+                            </Route>
+                        </Switch>
+                    </div>
+                </Router>
+            }
         </FirebaseAuthProvider>
     );
 }
@@ -841,7 +845,11 @@ class News extends React.Component {
     }
 
     requestCollection() {
-        db.collection('news').get().then((data) => this.setState({d:  data.docs}));
+        db.collection('news')
+            .orderBy('date', 'desc')
+            .limit(3)
+            .get()
+            .then((data) => this.setState({d:  data.docs}));
     }
 
     render() {
@@ -922,34 +930,6 @@ function Loading(){
     return (
         <div className="spinner-grow" role="status">
             <span className="sr-only">Loading...</span>
-        </div>
-    );
-}
-
-//TODO: use reducers
-function PrintNews(docs){
-    return (
-        <div className="row">
-            {docs.docs.value && docs.docs.value.map((value, index) => {
-                return <PrintPieceOfNews news={value}/>
-            })}
-        </div>
-    );
-}
-
-function PrintPieceOfNews(news){
-    console.log(news.news)
-    return (
-        <div className="col-12 mb-3">
-            <div className="card shadow-sm h-100">
-                <h5 className="card-header">{news.news.title}</h5>
-                <div className="card-body">
-                    {news.news.content}
-                </div>
-                <div className="card-footer">
-                    Date
-                </div>
-            </div>
         </div>
     );
 }
