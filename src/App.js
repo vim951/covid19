@@ -1484,7 +1484,7 @@ class ContributeComponent extends React.Component {
         if (this.state && this.state.privileged && this.state.privileged === 'yes'){
             return (
                 <>
-                    <form>
+                    <form id={'uploadForm'}>
                         <div className="form-group">
                             <label htmlFor="title">Title</label>
                             <input type="text" className="form-control" id="title" placeholder=""/>
@@ -1519,7 +1519,12 @@ class ContributeComponent extends React.Component {
                                     date: firebase.firestore.Timestamp.now(),
                                     source: document.getElementById("source").value,
                                     content: document.getElementById("content").value,
-                                });
+                                })
+                                .then(() => {
+                                    document.getElementById("uploadForm").reset();
+                                    alert('Your piece of news was successfully uploaded!');
+                                })
+                            ;
                         }}
                     >Upload</button>
                 </>
