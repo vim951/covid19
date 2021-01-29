@@ -1384,6 +1384,340 @@ export default function App() {
 
 //====================================================================================================
 
+class APIComponent extends React.Component {
+
+    static propTypes = {
+        api_url: PropTypes.string,
+        doc_id: PropTypes.string,
+        collection_id: PropTypes.string,
+        add_date: PropTypes.bool,
+        render_function: PropTypes.func
+    }
+
+    constructor(props) {
+        super(props);
+        this.check_doc = this.check_doc.bind(this)
+        this.update_data = this.update_data.bind(this)
+        this.update_doc = this.update_doc.bind(this)
+    }
+
+    componentDidMount(){
+        this.request_doc();
+    }
+
+    request_doc(){
+        db.collection(this.props.collection_id)
+            .doc(this.props.doc_id)
+            .get()
+            .then(this.check_doc);
+    }
+
+    check_doc(doc){
+        if (doc.data() && doc.data().Date && ((new Date().getTime())-(new Date(doc.data().Date)).getTime())<(MAX_HOURS*3600*1000)){
+            this.update_data(doc.data());
+        }else{
+            this.call_api();
+        }
+    }
+
+    update_data(data){
+        this.setState({data:  data});
+    }
+
+    call_api(){
+        fetch(this.props.api_url)
+            .then((response) =>
+                Promise.resolve(response.json()).then(this.update_doc)
+            )
+    }
+
+    update_doc(data){
+        data = Object.assign({}, data)
+        data.Date = firebase.firestore.Timestamp.now();
+        db.collection(this.props.collection_id)
+            .doc(this.props.doc_id)
+            .set(data)
+        this.update_data(data);
+    }
+
+    render() {
+        if (this.state){
+            return this.props.render_function(this.state.data);
+        }else{
+            return <Loading/>;
+        }
+    }
+
+}
+
+class ContributeComponent extends React.Component {
+
+    static propTypes = {
+        user: PropTypes.object,
+    }
+
+    constructor(props) {
+        super(props);
+        this.check_doc = this.check_doc.bind(this);
+    }
+
+    componentDidMount() {
+        this.requestCollection();
+    }
+
+    requestCollection() {
+        db.collection('users')
+            .doc(this.props.user.X.X)
+            .get()
+            .then(this.check_doc);
+    }
+
+    check_doc(doc){
+        if (doc.data() && doc.data().privileged) {
+            this.setState({privileged: doc.data().privileged});
+        }else{
+            this.setState({privileged:  'no'});
+        }
+    }
+
+    render() {
+        if (this.state && this.state.privileged && this.state.privileged === 'yes'){
+            return (
+                <>
+                    <form>
+                        <div className="form-group">
+                            <label htmlFor="title">Title</label>
+                            <input type="text" className="form-control" id="title" placeholder=""/>
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="region">Region</label>
+                            <select className="form-control" id="region">
+                                <option value="world">World</option>
+                                {country_list.map(c => {
+                                    return <option value={c.Slug}>{c.Country}</option>;
+                                })}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="content">Your piece of news</label>
+                            <textarea className="form-control" id="content" placeholder="" rows="10"/>
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="source">Source</label>
+                            <input type="textarea" className="form-control" id="source" placeholder=""/>
+                        </div>
+                    </form>
+                    <button
+                        className={'btn btn-primary'}
+                        onClick={() => {
+                            db.collection('news')
+                                .doc(makeId(50))
+                                .set({
+                                    title: document.getElementById("title").value,
+                                    region: document.getElementById("region").value,
+                                    published_by: this.props.user.displayName,
+                                    date: firebase.firestore.Timestamp.now(),
+                                    source: document.getElementById("source").value,
+                                    content: document.getElementById("content").value,
+                                });
+                        }}
+                    >Upload</button>
+                </>
+            );
+        }else if (this.state){
+            return <p>You need to be registered as a contributor to publish an article. To do so, please go to your login page.</p>;
+        }
+        else{
+            return <Loading/>;
+        }
+    }
+
+}
+
+class LogInUserComponent extends React.Component {
+
+    static propTypes = {
+        user: PropTypes.object,
+    }
+
+    constructor(props) {
+        super(props);
+        this.check_doc = this.check_doc.bind(this)
+        this.update_doc = this.update_doc.bind(this)
+    }
+
+    componentDidMount() {
+        this.requestCollection();
+    }
+
+    requestCollection() {
+        db.collection('users')
+            .doc(this.props.user.X.X)
+            .get()
+            .then(this.check_doc);
+    }
+
+    check_doc(doc){
+        if (doc.data() && doc.data().privileged) {
+            this.setState({privileged: doc.data().privileged});
+        }else{
+            this.setState({privileged:  'no'});
+            this.update_doc('no');
+        }
+    }
+
+    update_doc(value){
+        db.collection('users')
+            .doc(this.props.user.X.X)
+            .set({privileged: value});
+    }
+
+    render_greetings(){
+        return(
+            <>
+                <h2 className="mt-5 mb-3" >Welcome back!</h2>
+                <p>We are happy to see you {this.props.user.displayName}! Here are you profile parameters:</p>
+            </>
+        );
+    }
+
+    render_user_description(){
+        return (
+            <>
+                <div className="col-4 mb-3">
+                    <img src={this.props.user.photoURL} className="rounded float-left" alt="url"/>
+                </div>
+                <div className="col-8 mb-3">
+                    <ul>
+                        <li>Name: {this.props.user.displayName}</li>
+                        <li>Email: {this.props.user.email}</li>
+                        <li>Contributor status: {this.state.privileged}</li>
+                    </ul>
+                </div>
+            </>
+        );
+    }
+
+    render_log_out(){
+        return (
+            <>
+                <button className={'btn btn-secondary col-4 mb-3 ml-1 mr-1'}
+                        onClick={() => {
+                            firebase.auth().signOut();
+                        }}
+                >Log me out</button>
+            </>
+        );
+    }
+
+    render_upgrade(){
+        return (
+            <>
+                <button className={'btn btn-secondary col-4 mb-3 ml-1 mr-1'}
+                        onClick={() => {
+                            this.setState({privileged: 'yes'});
+                            this.update_doc('yes');
+                        }}
+                >Upgrade to contributor</button>
+            </>
+        );
+    }
+
+    render() {
+        if (this.state){
+            return (
+                <>
+                    {this.render_greetings()}
+                    <div className="row">
+                        {this.render_user_description()}
+                        {this.render_log_out()}
+                        {this.state.privileged === 'no' ? (
+                            this.render_upgrade()
+                        ) : (
+                            <></>
+                        )}
+                    </div>
+                </>
+            );
+        }else{
+            return <Loading/>;
+        }
+    }
+
+}
+
+class NewsComponent extends React.Component {
+
+    static propTypes = {
+        area: PropTypes.string
+    }
+
+    componentDidMount() {
+        this.requestCollection();
+    }
+
+    requestCollection() {
+        console.log(this.props.area);
+        db.collection('news')
+            .where("region", "==", this.props.area)
+            .orderBy('date', 'desc')
+            .limit(3)
+            .get()
+            .then((data) => this.setState({d:  data.docs}));
+    }
+
+    render() {
+        if (this.state){
+            return (<div className="row">
+                {this.state.d.map(doc => {
+                    return (
+                        <>
+                            <div className="col-12 col-md-6 col-lg-4 mb-3">
+                                <div className="card">
+                                    <img className="card-img-top" src="https://firebasestorage.googleapis.com/v0/b/covid19-bd85f.appspot.com/o/news.resized.jpg?alt=media&token=af4def4e-6e1c-42c7-a2fb-33a40be75e19" alt="Card image cap"/>
+                                    <div className="card-body">
+                                        <h5 className="card-title">{doc.data().title}</h5>
+                                        <p className="card-text">Published by {doc.data().published_by} on {doc.data().date.toDate().toLocaleDateString()}</p>
+                                        <button type="button" className="btn btn-primary" data-toggle="modal" data-target={"#modal_"+doc.id}>
+                                            Read
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal fade" id={"modal_"+doc.id} tabIndex="-1" role="dialog"
+                                 aria-labelledby={"label_modal_"+doc.id} aria-hidden="true">
+                                <div className="modal-dialog" role="document">
+                                    <div className="modal-content">
+                                        <div className="modal-header">
+                                            <h5 className="modal-title" id={"label_modal_"+doc.id}>{doc.data().title}</h5>
+                                            <button type="button" className="close" data-dismiss="modal"
+                                                    aria-label="Close">
+                                                <span aria-hidden="true">&times;</span>
+                                            </button>
+                                        </div>
+                                        <div className="modal-body">
+                                            {doc.data().content}
+                                        </div>
+                                        <div className="modal-footer">
+                                            Published by {doc.data().published_by} on {doc.data().date.toDate().toLocaleDateString()}. <br/>
+                                            Source: {doc.data().source}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    );
+                })}
+            </div>);
+        }else{
+            return <Loading/>;
+        }
+    }
+
+}
+
+//====================================================================================================
+
 function GlobalSummaryPage() {
     return (
         <>
@@ -1656,8 +1990,6 @@ function APIGlobalSummaryPart3(){
     );
 }
 
-//====================================================================================================
-
 function APIGlobalSummaryPart4(){
     return (
         <APIComponent
@@ -1721,79 +2053,16 @@ function APIGlobalSummaryPart4(){
     );
 }
 
-class APIComponent extends React.Component {
-
-    static propTypes = {
-        api_url: PropTypes.string,
-        doc_id: PropTypes.string,
-        collection_id: PropTypes.string,
-        add_date: PropTypes.bool,
-        render_function: PropTypes.func
-    }
-
-    constructor(props) {
-        super(props);
-        this.check_doc = this.check_doc.bind(this)
-        this.update_data = this.update_data.bind(this)
-        this.update_doc = this.update_doc.bind(this)
-    }
-
-    componentDidMount(){
-        this.request_doc();
-    }
-
-    request_doc(){
-        db.collection(this.props.collection_id)
-            .doc(this.props.doc_id)
-            .get()
-            .then(this.check_doc);
-    }
-
-    check_doc(doc){
-        if (doc.data() && doc.data().Date && ((new Date().getTime())-(new Date(doc.data().Date)).getTime())<(MAX_HOURS*3600*1000)){
-            this.update_data(doc.data());
-        }else{
-            this.call_api();
-        }
-    }
-
-    update_data(data){
-        this.setState({data:  data});
-    }
-
-    call_api(){
-        fetch(this.props.api_url)
-            .then((response) =>
-                Promise.resolve(response.json()).then(this.update_doc)
-            )
-    }
-
-    update_doc(data){
-        data = Object.assign({}, data)
-        data.Date = firebase.firestore.Timestamp.now();
-        db.collection(this.props.collection_id)
-            .doc(this.props.doc_id)
-            .set(data)
-        this.update_data(data);
-    }
-
-    render() {
-        if (this.state){
-            return this.props.render_function(this.state.data);
-        }else{
-            return <Loading/>;
-        }
-    }
-
-}
-
 //====================================================================================================
 
 function SummaryCountryPage(){
     let { id } = useParams();
     return (
         <>
+            <h1 className="mt-5 mb-3">Latest news from {id.charAt(0).toUpperCase() + id.substring(1)}</h1>
+            <NewsComponent area={id}/>
             <APICountrySummaryPart1 id={id}/>
+            <APICountrySummaryPart2 id={id}/>
         </>
     );
 }
@@ -1875,7 +2144,7 @@ function APICountrySummaryPart1(id){
                         columns={columns}
                         options={{ search: false, paging: false, filtering: false, exportButton: true }}
                     />
-                    <h2 className={'mt-5 mb-3'}>Covid19 cases distribution in {data.Global.Country}</h2>
+                    <h2 className={'mt-5 mb-3'}>Covid19 cases distribution</h2>
                     <Pie data={pie_data}/>
                 </>
             );
@@ -1895,6 +2164,7 @@ function APICountrySummaryPart2(id){
             add_date={false}
             render_function={(data) => {
                 data = groupBy(Object.values(data), 'Date');
+                delete data.undefined;
                 data = Object.keys(data).map(function(key, index) {
                     return {
                         date: key,
@@ -1913,39 +2183,29 @@ function APICountrySummaryPart2(id){
                     };
                 });
                 const bar_data = {
-                    labels: Object.keys(data.cases).sort(sortDateArray),
+                    labels: data.map((value => {
+                        return (new Date(Date.parse(value.date))).toLocaleDateString();
+                    })),
                     datasets: [
                         {
-                            label: 'cases',
-                            data: Object.values(Object.keys(data.cases).sort(sortDateArray).reduce(
-                                (obj, key) => {
-                                    obj[key] = data.cases[key];
-                                    return obj;
-                                },
-                                {}
-                            )),
+                            label: 'confirmed',
+                            data: data.map((value => {
+                                return value.confirmed;
+                            })),
                             backgroundColor: BLUE,
                         },
                         {
                             label: 'recovered',
-                            data: Object.values(Object.keys(data.recovered).sort(sortDateArray).reduce(
-                                (obj, key) => {
-                                    obj[key] = data.recovered[key];
-                                    return obj;
-                                },
-                                {}
-                            )),
+                            data: data.map((value => {
+                                return value.recovered;
+                            })),
                             backgroundColor: GREEN,
                         },
                         {
                             label: 'deaths',
-                            data: Object.values(Object.keys(data.deaths).sort(sortDateArray).reduce(
-                                (obj, key) => {
-                                    obj[key] = data.deaths[key];
-                                    return obj;
-                                },
-                                {}
-                            )),
+                            data: data.map((value => {
+                                return value.deaths;
+                            })),
                             backgroundColor: RED,
                         },
                     ],
@@ -1963,9 +2223,8 @@ function APICountrySummaryPart2(id){
                 }
                 return (
                     <>
-                    <pre style={{ height: 500, overflow: "auto" }}>
-                        {JSON.stringify(data, null, 2)}
-                    </pre>
+                        <h2 className={'mt-5 mb-3'}>Daily covid19 cases (7 days)</h2>
+                        <Bar data={bar_data} options={options} />
                     </>
                 );
             }}/>
@@ -1973,212 +2232,6 @@ function APICountrySummaryPart2(id){
 }
 
 //====================================================================================================
-
-function makeId(length) { //From: https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
-    var result           = '';
-    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for ( var i = 0; i < length; i++ ) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
-}
-
-class ContributeComponent extends React.Component {
-
-    static propTypes = {
-        user: PropTypes.object,
-    }
-
-    constructor(props) {
-        super(props);
-        this.check_doc = this.check_doc.bind(this);
-    }
-
-    componentDidMount() {
-        this.requestCollection();
-    }
-
-    requestCollection() {
-        db.collection('users')
-            .doc(this.props.user.X.X)
-            .get()
-            .then(this.check_doc);
-    }
-
-    check_doc(doc){
-        if (doc.data() && doc.data().privileged) {
-            this.setState({privileged: doc.data().privileged});
-        }else{
-            this.setState({privileged:  'no'});
-        }
-    }
-
-    render() {
-        if (this.state && this.state.privileged && this.state.privileged === 'yes'){
-            return (
-                <>
-                    <form>
-                        <div className="form-group">
-                            <label htmlFor="title">Title</label>
-                            <input type="text" className="form-control" id="title" placeholder=""/>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="region">Region</label>
-                            <select className="form-control" id="region">
-                                <option value="world">World</option>
-                                {country_list.map(c => {
-                                    return <option value={c.Slug}>{c.Country}</option>;
-                                })}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="content">Your piece of news</label>
-                            <textarea className="form-control" id="content" placeholder="" rows="10"/>
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="source">Source</label>
-                            <input type="textarea" className="form-control" id="source" placeholder=""/>
-                        </div>
-                    </form>
-                    <button
-                        className={'btn btn-primary'}
-                        onClick={() => {
-                            db.collection('news')
-                                .doc(makeId(50))
-                                .set({
-                                    title: document.getElementById("title").value,
-                                    region: document.getElementById("region").value,
-                                    published_by: this.props.user.displayName,
-                                    date: firebase.firestore.Timestamp.now(),
-                                    source: document.getElementById("source").value,
-                                    content: document.getElementById("content").value,
-                                });
-                        }}
-                    >Upload</button>
-                </>
-            );
-        }else if (this.state){
-            return <p>You need to be registered as a contributor to publish an article. To do so, please go to your login page.</p>;
-        }
-        else{
-            return <Loading/>;
-        }
-    }
-
-}
-
-class LogInUserComponent extends React.Component {
-
-    static propTypes = {
-        user: PropTypes.object,
-    }
-
-    constructor(props) {
-        super(props);
-        this.check_doc = this.check_doc.bind(this)
-        this.update_doc = this.update_doc.bind(this)
-    }
-
-    componentDidMount() {
-        this.requestCollection();
-    }
-
-    requestCollection() {
-        db.collection('users')
-            .doc(this.props.user.X.X)
-            .get()
-            .then(this.check_doc);
-    }
-
-    check_doc(doc){
-        if (doc.data() && doc.data().privileged) {
-            this.setState({privileged: doc.data().privileged});
-        }else{
-            this.setState({privileged:  'no'});
-            this.update_doc('no');
-        }
-    }
-
-    update_doc(value){
-        db.collection('users')
-            .doc(this.props.user.X.X)
-            .set({privileged: value});
-    }
-
-    render_greetings(){
-        return(
-            <>
-                <h2 className="mt-5 mb-3" >Welcome back!</h2>
-                <p>We are happy to see you {this.props.user.displayName}! Here are you profile parameters:</p>
-            </>
-        );
-    }
-
-    render_user_description(){
-        return (
-            <>
-                <div className="col-4 mb-3">
-                    <img src={this.props.user.photoURL} className="rounded float-left" alt="url"/>
-                </div>
-                <div className="col-8 mb-3">
-                    <ul>
-                        <li>Name: {this.props.user.displayName}</li>
-                        <li>Email: {this.props.user.email}</li>
-                        <li>Contributor status: {this.state.privileged}</li>
-                    </ul>
-                </div>
-            </>
-        );
-    }
-
-    render_log_out(){
-        return (
-            <>
-                <button className={'btn btn-secondary col-4 mb-3 ml-1 mr-1'}
-                        onClick={() => {
-                            firebase.auth().signOut();
-                        }}
-                >Log me out</button>
-            </>
-        );
-    }
-
-    render_upgrade(){
-        return (
-            <>
-                <button className={'btn btn-secondary col-4 mb-3 ml-1 mr-1'}
-                        onClick={() => {
-                            this.setState({privileged: 'yes'});
-                            this.update_doc('yes');
-                        }}
-                >Upgrade to contributor</button>
-            </>
-        );
-    }
-
-    render() {
-        if (this.state){
-            return (
-                <>
-                    {this.render_greetings()}
-                    <div className="row">
-                        {this.render_user_description()}
-                        {this.render_log_out()}
-                        {this.state.privileged === 'no' ? (
-                            this.render_upgrade()
-                        ) : (
-                            <></>
-                        )}
-                    </div>
-                </>
-            );
-        }else{
-            return <Loading/>;
-        }
-    }
-
-}
 
 function LogInMessage(){
     return (
@@ -2241,74 +2294,14 @@ function LoginPage() {
 
 //====================================================================================================
 
-class NewsComponent extends React.Component {
-
-    static propTypes = {
-        area: PropTypes.string
+function makeId(length) { //From: https://stackoverflow.com/questions/1349404/generate-random-string-characters-in-javascript
+    var result           = '';
+    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < length; i++ ) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
     }
-
-    componentDidMount() {
-        this.requestCollection();
-    }
-
-    requestCollection() {
-        console.log(this.props.area);
-        db.collection('news')
-            .where("region", "==", this.props.area)
-            .orderBy('date', 'desc')
-            .limit(3)
-            .get()
-            .then((data) => this.setState({d:  data.docs}));
-    }
-
-    render() {
-        if (this.state){
-            return (<div className="row">
-                {this.state.d.map(doc => {
-                    return (
-                        <>
-                            <div className="col-12 col-md-6 col-lg-4 mb-3">
-                                <div className="card">
-                                    <img className="card-img-top" src="https://firebasestorage.googleapis.com/v0/b/covid19-bd85f.appspot.com/o/news.resized.jpg?alt=media&token=af4def4e-6e1c-42c7-a2fb-33a40be75e19" alt="Card image cap"/>
-                                    <div className="card-body">
-                                        <h5 className="card-title">{doc.data().title}</h5>
-                                        <p className="card-text">Published by {doc.data().published_by} on {doc.data().date.toDate().toLocaleDateString()}</p>
-                                        <button type="button" className="btn btn-primary" data-toggle="modal" data-target={"#modal_"+doc.id}>
-                                            Read
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="modal fade" id={"modal_"+doc.id} tabIndex="-1" role="dialog"
-                                 aria-labelledby={"label_modal_"+doc.id} aria-hidden="true">
-                                <div className="modal-dialog" role="document">
-                                    <div className="modal-content">
-                                        <div className="modal-header">
-                                            <h5 className="modal-title" id={"label_modal_"+doc.id}>{doc.data().title}</h5>
-                                            <button type="button" className="close" data-dismiss="modal"
-                                                    aria-label="Close">
-                                                <span aria-hidden="true">&times;</span>
-                                            </button>
-                                        </div>
-                                        <div className="modal-body">
-                                            {doc.data().content}
-                                        </div>
-                                        <div className="modal-footer">
-                                            Published by {doc.data().published_by} on {doc.data().date.toDate().toLocaleDateString()}. <br/>
-                                            Source: {doc.data().source}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    );
-                })}
-            </div>);
-        }else{
-            return <Loading/>;
-        }
-    }
-
+    return result;
 }
 
 function ContributionPage() {
@@ -2328,6 +2321,8 @@ function ContributionPage() {
       </>
   );
 }
+
+//====================================================================================================
 
 function Loading(){
     return (
